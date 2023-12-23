@@ -1,0 +1,352 @@
+﻿var all = File.ReadAllLines("example.txt");
+
+var xsize = all[0].Length;
+var ysize = all.Length;
+
+var arr = new char[xsize, ysize];
+
+for (int x = 0; x < xsize; x++)
+{
+    for (int y = 0; y < ysize; y++)
+    {
+        arr[x, y] = all[y][x];
+    }
+}
+
+//Dictionary<int, Dictionary<Direction, FastestPath>>[,] heatmap = new Dictionary<int, Dictionary<Direction, FastestPath>>[xsize, ysize];
+int?[,] heatmap = new int?[xsize, ysize];
+
+Stack<Cursor> stack = new Stack<Cursor>();
+Cursor? leastheatcursor = null;
+var cursorBuilder = new CursorBuilder(xsize, ysize, arr);
+stack.Push(cursorBuilder.CreateCursor(0, 0, Direction.Right));
+var oldcount = 0;
+while (stack.Count > 0)
+{
+    var cursor = stack.Pop();
+    if (leastheatcursor != null && cursor.heat >= leastheatcursor.heat)
+    {
+        if (cursor.parent != null)
+        {
+            cursor.parent.SetAlreadyPassed(cursor.x, cursor.y, cursor.straight, cursor.direction); 
+        }
+        continue;
+    }
+    if (oldcount != stack.Count)
+    {
+        Console.WriteLine($"Stack.Count = {stack.Count}. Cursor on top: {cursor.x}, {cursor.y}, {cursor.direction}, {cursor.straight}, level: {cursor.level}");
+        if (stack.Count == 238)
+        {
+            Console.WriteLine($"238, {DateTime.Now}");
+        }
+        oldcount = stack.Count;
+        
+    }
+    
+    
+    if (cursor.ReachedEnd())
+    {
+        if (leastheatcursor == null || leastheatcursor.heat > cursor.heat)
+        {
+            leastheatcursor = cursor;
+            var iteratecursor = cursor;
+            do
+            {
+                if (heatmap[iteratecursor.x, iteratecursor.y] == null || heatmap[iteratecursor.x, iteratecursor.y] > iteratecursor.heat)
+                {
+                    heatmap[iteratecursor.x, iteratecursor.y] = iteratecursor.heat;
+                }
+                iteratecursor = iteratecursor.parent;
+            } while (iteratecursor != null);
+            //while (cursor.parent != null)
+            //{
+            //    var parent = cursor.parent;
+            //    //var heatdiff = leastheatcursor.heat - parent.heat;
+
+            //    if (heatmap[parent.x, parent.y] == null)
+            //    {
+            //        heatmap[parent.x, parent.y] = new Dictionary<int, Dictionary<Direction, FastestPath>>();
+            //    }
+            //    if (!heatmap[parent.x, parent.y].ContainsKey(parent.straight))
+            //    {
+            //        heatmap[parent.x, parent.y].Add(parent.straight, new Dictionary<Direction, FastestPath>());
+            //    }
+            //    if (!heatmap[parent.x, parent.y][parent.straight].ContainsKey(parent.direction)) {
+            //        heatmap[parent.x, parent.y][parent.straight].Add(parent.direction, new FastestPath(parent.heat));
+            //    }
+            //    else
+            //    {
+            //        if (heatmap[parent.x, parent.y][parent.straight][parent.direction].heat >= parent.heat)
+            //        {
+            //            // there is no reason to backtrack this path. we have seen bether options already
+            //            break;
+            //        }
+            //    }
+
+            //    if (heatmap[parent.x, parent.y][parent.straight][parent.direction].heatpaths.ContainsKey(cursor.direction) &&
+            //         heatmap[parent.x, parent.y][parent.straight][parent.direction].heatpaths[cursor.direction] <= heatdiff)
+            //    {
+            //        // there is no reason to backtrack this path as it is longer that we have found before
+            //        break;
+            //    }
+            //    heatmap[parent.x, parent.y][parent.straight][parent.direction].AddHeatpath(cursor.direction, heatdiff);
+
+            //    cursor = parent;
+            //}
+        }
+        continue;
+    }
+    bool newcursor = false;
+    if (cursor.direction != Direction.Right)
+    {
+        newcursor |= ProcessCursorDirection(Direction.Left, cursor);
+    }
+    if (cursor.direction != Direction.Left)
+    {
+        newcursor |= ProcessCursorDirection(Direction.Right, cursor);
+    }
+    if (cursor.direction != Direction.Up)
+    {
+        newcursor |= ProcessCursorDirection(Direction.Down, cursor);
+    }
+    if (cursor.direction != Direction.Down)
+    {
+        newcursor |= ProcessCursorDirection(Direction.Up, cursor);
+    }
+
+    if (!newcursor)
+    {
+        if (cursor.parent != null)
+        {
+            var already = cursor.parent.SetAlreadyPassed(cursor.x, cursor.y, cursor.straight, cursor.direction);
+            if (!already)
+            {
+                Console.WriteLine("New block");
+            }
+        }
+    }
+}
+
+Console.WriteLine($"Minimum heat = {leastheatcursor?.heat}");
+
+// Return true if a new cursor is pushed
+bool ProcessCursorDirection(Direction direction, Cursor cursor)
+{
+    var child = cursor.CreateChild(direction);
+    child.MoveForward();
+
+    // check if this path already has a better solution:
+    
+
+    if (child.IsValid())
+    {
+        cursor.SetAlreadyPassed(child.x, child.y, child.straight, child.direction);
+        child.SetAlreadyPassed(child.x, child.y, child.straight, child.direction);
+        //if (heatmap[child.x, child.y] != null && heatmap[child.x, child.y].ContainsKey(child.straight)
+        //&& heatmap[child.x, child.y][child.straight].ContainsKey(child.direction)
+        //&& heatmap[child.x, child.y][child.straight][child.direction].heat <= child.heat)
+        //{
+        //    return;
+        //}
+        if (heatmap[child.x, child.y] <= child.heat)
+        {
+            // there was a path that was less heat, so no reason to trace this further
+            return false;
+        }
+
+        stack.Push(child);
+        return true;
+    }
+    return false;
+}
+
+enum Direction
+{
+    Left, Right, Up, Down
+}
+
+class CursorBuilder
+{
+    private readonly int xsize;
+    private readonly int ysize;
+    private readonly char[,] map;
+
+    public CursorBuilder(int xsize, int ysize, char[,] map)
+    {
+        this.xsize = xsize;
+        this.ysize = ysize;
+        this.map = map;
+    }
+
+    public Cursor CreateCursor(int x, int y, Direction direction)
+    {
+        return new Cursor(x, y, direction, xsize, ysize, map);
+    }
+}
+
+class Cursor
+{
+    public int level = 0;
+    public Direction direction;
+    private readonly int xsize;
+    private readonly int ysize;
+    public readonly Cursor parent;
+    public int x;
+    public int y;
+    public int straight = 0; // max 3 straights
+    bool invalid;
+    public Dictionary<int, Dictionary<Direction, bool>>[,] alreadypassed;
+    char[,] map;
+    public int heat = 0;
+
+    public Cursor(int x, int y, Direction direction, int xsize, int ysize, char[,] map)
+    {
+        this.x = x;
+        this.y = y;
+        this.direction = direction;
+        this.xsize = xsize;
+        this.ysize = ysize;
+        alreadypassed = new Dictionary<int, Dictionary<Direction, bool>>[xsize, ysize];
+        this.map = map;
+    }
+
+    Cursor(Cursor parent, int x, int y, Direction direction, int xsize, int ysize, char[,] map, Dictionary<int, Dictionary<Direction, bool>>[,] alreadypassed, int heat)
+    {
+        this.parent = parent;
+        this.x = x;
+        this.y = y;
+        this.direction = direction;
+        this.xsize = xsize;
+        this.ysize = ysize;
+        this.alreadypassed = new Dictionary<int, Dictionary<Direction, bool>>[xsize, ysize];
+        this.heat = heat;
+        for (int xi  = 0; xi < xsize; xi++)
+        {
+            for (int yi = 0; yi < ysize; yi++)
+            {
+                if (alreadypassed[xi, yi] == null)
+                {
+                    continue;
+                }
+                this.alreadypassed[xi, yi] = new Dictionary<int, Dictionary<Direction, bool>>();
+                foreach (var key in alreadypassed[xi, yi].Keys)
+                {
+                    this.alreadypassed[xi, yi].Add(key, new Dictionary<Direction, bool>());
+                    foreach (var dirkey in alreadypassed[xi, yi][key].Keys)
+                    {
+                        this.alreadypassed[xi, yi][key].Add(dirkey, true);
+                    }
+                }
+            }
+        }
+        this.map = map;
+    }
+
+    public Cursor CreateChild(Direction direction)
+    {
+        var newcursor = new Cursor(this, x, y, direction, xsize, ysize, map, alreadypassed, heat);
+        newcursor.level = level + 1;
+        if (this.direction == newcursor.direction)
+        {
+            newcursor.straight = straight;
+        }
+        return newcursor;
+    }
+
+    void ChangeDirection(Direction direction)
+    {
+        this.direction = direction;
+        straight = 0;
+    }
+    public void MoveForward()
+    {
+        switch(direction)
+        {
+            case Direction.Left:
+                x--;
+                break;
+            case Direction.Right:
+                x++;
+                break;
+            case Direction.Up:
+                y--;
+                break;
+            case Direction.Down:
+                y++;
+                break;
+        }
+        straight++;
+        if (!IsValid())
+        {
+            return;
+        }
+
+        if (SetAlreadyPassed(x, y, straight, direction))
+        { 
+            invalid = true;
+        }
+        else
+        {
+            heat += map[x, y] - '0';
+        }
+    }
+
+    public bool IsValid()
+    {
+        var isValid = !invalid && x >= 0 && x < xsize && y >= 0 && y < ysize && straight < 4;
+        this.invalid = !isValid;
+        return isValid;
+    }
+
+    public bool ReachedEnd()
+    {
+        return x == xsize - 1 && y == ysize - 1; 
+    }
+
+    internal bool SetAlreadyPassed(int x, int y, int straight, Direction direction)
+    {
+        if (alreadypassed[x, y] == null)
+        {
+            alreadypassed[x, y] = new Dictionary<int, Dictionary<Direction, bool>>();
+        }
+        if (!alreadypassed[x, y].ContainsKey(straight))
+        {
+            alreadypassed[x, y].Add(straight, new Dictionary<Direction, bool>());
+        }
+        if (alreadypassed[x, y][straight].ContainsKey(direction))
+        {
+            return true;
+        }
+        else
+        {
+            alreadypassed[x, y][straight].Add(direction, true);
+            return false;
+        }
+    }
+}
+
+class FastestPath
+{
+    public Direction direction;
+    public int minheat;
+    public int heat;
+    public Dictionary<Direction, int> heatpaths = new Dictionary<Direction, int>();
+    public FastestPath(int heat)
+    {
+        this.heat = heat;
+    }
+    public void AddHeatpath(Direction direction, int heat)
+    {
+        if (heatpaths.ContainsKey(direction)) {
+            heatpaths[direction] = heat;
+        } else
+        {
+            heatpaths.Add(direction, heat);
+        }
+        if (this.minheat > heat)
+        {
+            this.minheat = heat;
+            this.direction = direction;
+        }
+    }
+}
