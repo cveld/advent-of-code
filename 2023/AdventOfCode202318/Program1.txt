@@ -1,0 +1,116 @@
+﻿using System.Text;
+
+var lines = File.ReadAllLines("puzzle1.txt");
+var edges = new Dictionary<int, Dictionary<int, bool>>();
+var x = 0;
+var y = 0;
+var xsizemax = 0;
+var xsizemin = 0;
+var ysizemax = 0;
+var ysizemin = 0;
+foreach (var line in lines)
+{
+    var split = line.Split(' ');
+    var direction = split[0];
+    var count = int.Parse(split[1]);
+    for (var i = 0; i < count; i++)
+    {
+        switch (direction)
+        {
+            case "R":
+                x++;
+                break;
+            case "L":
+                x--;
+                break;
+            case "D":
+                y++;
+                break;
+            case "U":
+                y--;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(direction));
+        }
+        if (xsizemax < x + 1) xsizemax = x + 1;
+        if (x < xsizemin) xsizemin = x;
+        if (y < ysizemin) ysizemin = y;
+        if (ysizemax < y + 1) ysizemax = y + 1;
+        if (!edges.ContainsKey(y))
+        {
+            edges.Add(y, new Dictionary<int, bool>());
+        }
+        edges[y][x] = true;
+    }
+}
+Console.WriteLine($"Size = {xsizemin}, {ysizemin} - {xsizemax}, {ysizemax}");
+
+var counted = 0;
+var output = new StringBuilder();
+
+for (var yi = ysizemin; yi < ysizemax; yi++)
+{
+    var inside = false;
+    var xpos = int.MinValue;
+    var passedempty = false;
+    var lastposition = false;
+    for (var xi = xsizemin; xi < xsizemax; xi++)
+    {
+        var present = edges.ContainsKey(yi) && edges[yi].ContainsKey(xi);
+        var enabled = present;
+        
+        if (lastposition != present)
+        {
+            if (!lastposition)
+            {
+                xpos = xi;
+                if (!inside)
+                {
+                    inside = true;
+                }
+                else
+                {
+                    inside = false;
+                }
+            }
+            else
+            {
+                if (xpos != xi - 1)
+                {
+                    if (edges.ContainsKey(yi - 1) && edges[yi - 1].ContainsKey(xpos) && edges.ContainsKey(yi - 1) && edges[yi - 1].ContainsKey(xi - 1))
+                    {
+                        inside = !inside;
+                    }
+                    if (edges.ContainsKey(yi + 1) && edges[yi + 1].ContainsKey(xpos) && edges.ContainsKey(yi + 1) && edges[yi + 1].ContainsKey(xi - 1))
+                    {
+                        inside = !inside;
+                    }
+                }
+            }
+        }
+        enabled |= inside;
+        if (enabled) counted++;
+        lastposition = present;
+        switch (present, inside)
+        {
+            case (true, true):
+                output.Append("#");
+                break;
+            case (false, true):
+                output.Append("/");
+                break;
+            case (true, false):
+                output.Append("*");
+                break;
+            case (false, false):
+                output.Append('.');
+                break;
+        }
+    }
+    //Console.WriteLine($"{yi}: {counted}");
+    output.AppendLine();
+}
+
+File.WriteAllText("output.txt", output.ToString());
+
+Console.WriteLine($"Count = {counted}");
