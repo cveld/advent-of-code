@@ -1,0 +1,161 @@
+﻿//var alllines = File.ReadAllLines("example.txt");
+var alllines = File.ReadAllLines("puzzle1.txt");
+var rules = new Dictionary<string, Rule>();
+var parts = new List<string>();
+
+var rules_phase = true;
+foreach (var line in alllines)
+{
+    if (line == String.Empty)
+    {
+        rules_phase = false;
+        continue;
+    }
+    var rule = new Rule(line);
+    if (rules_phase) rules.Add(rule.name, rule);
+    else parts.Add(line);
+}
+
+var totalcount = 0;
+foreach (var part in parts)
+{
+    var vars_str = part.Substring(1, part.Length - 2);
+    var split = vars_str.Split(',');
+    var vars = new Dictionary<string, int>();
+    foreach (var s in split)
+    {
+        var k = s[0].ToString();
+        var v = int.Parse(s.Substring(2));
+        vars.Add(k, v);
+    }
+
+    // execute rules
+    var currentRule = rules["in"];
+    Result? result = null; 
+    while (!result.HasValue)
+    {
+        foreach (var expression in currentRule.expressions)
+        {
+            if (expression.compare == Compare.Done)
+            {
+                if (expression.result == "R")
+                {
+                    result = Result.Rejected;
+                    break;
+                }
+                if (expression.result == "A")
+                {
+                    result = Result.Accepted; 
+                    break;
+                }
+                currentRule = rules[expression.result];
+                break;
+            }
+            if (expression.compare == Compare.LessThan)
+            {
+                if (vars[expression.key!] < expression.value)
+                {
+                    if (expression.result == "R")
+                    {
+                        result = Result.Rejected;
+                        break;
+                    }
+                    if (expression.result == "A")
+                    {
+                        result = Result.Accepted;
+                        break;
+                    }
+                    currentRule = rules[expression.result];
+                    break;
+                }
+            }
+            if (expression.compare == Compare.GreaterThan)
+            {
+                if (vars[expression.key!] > expression.value)
+                {
+                    if (expression.result == "R")
+                    {
+                        result = Result.Rejected;
+                        break;
+                    }
+                    if (expression.result == "A")
+                    {
+                        result = Result.Accepted;
+                        break;
+                    }
+                    currentRule = rules[expression.result];
+                    break;
+                }
+            }
+        }
+    }
+    if (result == Result.Accepted)
+    {
+        var count = 0;
+        foreach (var v in vars)
+        {
+            count += v.Value;
+        }
+        totalcount += count;
+    }
+}
+
+Console.WriteLine($"Total count = {totalcount}");
+
+enum Result
+{
+    Undefined,
+    Rejected,
+    Accepted
+}
+
+class Rule
+{
+    public List<Expression> expressions = new List<Expression>();
+    public string name;
+    public Rule(string rule)
+    {
+        var split = rule.Split('{');
+        name = split[0];
+        var segments = split[1].Substring(0, split[1].Length - 1).Split(',');
+        foreach (var segment in segments)
+        {
+            expressions.Add(new Expression(segment));
+        }
+    }
+}
+enum Compare
+{
+    Undefined,
+    GreaterThan,
+    LessThan,
+    Done
+}
+class Expression
+{
+    public string? key;
+    public int? value;
+    public string result;
+    public Compare compare;
+
+    public Expression(string expression)
+    {
+        var segments = expression.Split(":");
+        if (segments.Length == 1 ) {
+            compare = Compare.Done;
+            result = expression;
+            return;
+        }
+        result = segments[1];
+        if (segments[0][1] == '<')
+        {
+            compare = Compare.LessThan;
+        }
+        if (segments[0][1] == '>')
+        {
+            compare = Compare.GreaterThan;
+        }
+        key = segments[0][0].ToString();
+        value = int.Parse(segments[0].Substring(2));
+    }
+}

@@ -1,0 +1,44 @@
+﻿//var alllines = File.ReadAllLines("example.txt");
+var alllines = File.ReadAllLines("puzzle1.txt");
+
+
+var cubesmax = new Dictionary<string, int>();
+cubesmax.Add("red", 12);
+cubesmax.Add("green", 13);
+cubesmax.Add("blue", 14);
+
+
+var totalindex = 0;
+foreach (var line in alllines)
+{
+    var index = line.Split(":");
+    var indexint = int.Parse(index[0].Substring(5));
+    var rounds = index[1].Trim().Split(';');
+    var validgame = true;
+    foreach (var round in rounds)
+    {
+        var validround = true;
+        var colors = round.Split(',');
+        foreach (var colorcount in colors)
+        {
+            var color = colorcount.Trim().Split(" ");
+            var count = int.Parse(color[0]);
+            if (cubesmax[color[1]] < count)
+            {
+                validround = false;
+                break;
+            }
+        }
+        if (!validround)
+        {
+            validgame = false;
+            break;
+        }
+    }
+    if (validgame)
+    {
+        totalindex += indexint;
+    }
+}
+
+Console.WriteLine($"Total: {totalindex}");
